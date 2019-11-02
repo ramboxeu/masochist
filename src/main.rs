@@ -1,17 +1,39 @@
-use actix_web::{web, App, HttpServer, HttpResponse, Responder, dev, Result, http};
-use actix_web::middleware::errhandlers::{ErrorHandlerResponse, ErrorHandlers};
+#![feature(proc_macro_hygiene, decl_macro)]
 
-fn main() {
-    HttpServer::new(|| {
-        App::new()
-            .route("/", web::get().to(index))
-    })
-        .bind("127.0.0.1:3000")
-        .unwrap()
-        .run()
-        .unwrap();
+#[macro_use] extern crate rocket;
+
+use rocket::Rocket;
+
+#[get("/")]
+fn index() -> &'static str {
+    "Hello World!"
 }
 
-fn index() -> impl Responder {
-    HttpResponse::Ok().body("Hello World!")
+fn assemble_rocket() -> Rocket {
+    rocket::ignite().mount("/", routes![index])
+}
+
+fn main() {
+    assemble_rocket().launch();
+}
+
+#[cfg(test)]
+mod test {
+    use super::assemble_rocket;
+    use rocket::local::Client;
+    use rocket::http::Status;
+
+    #[test]
+    fn index_hello_world() {
+        let client = Client::new(assemble_rocket()).expect("valid rocket instance");
+        let mut response = client.get("/").dispatch();
+        assert_eq!(response.body_string(), Some("Hello World!".into()));
+    }
+
+    #[test]
+    fn unknown_route_error_404() {
+        let client = Client::new(assemble_rocket()).expect("valid rocket instance");
+        let mut response = client.get("/notexsitingroute").dispatch();
+        assert_eq!(response.status(), Status::NotFound);
+    }
 }
